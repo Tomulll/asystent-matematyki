@@ -1,9 +1,9 @@
-import openai
+from openai import OpenAI
 import os
 import streamlit as st
 
 def generuj_test(temat, klasa, liczba_zadan, trudnosc, typ):
-    openai.api_key = st.secrets["openai_api_key"]
+    client = OpenAI(api_key=st.secrets["openai_api_key"])
 
     prompt = (
         f"Stwórz {liczba_zadan} zadań matematycznych dla uczniów klasy {klasa}. "
@@ -16,7 +16,7 @@ def generuj_test(temat, klasa, liczba_zadan, trudnosc, typ):
     )
 
     try:
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "Jesteś pomocnym asystentem nauczyciela matematyki."},
