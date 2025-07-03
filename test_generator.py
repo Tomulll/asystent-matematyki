@@ -27,5 +27,5 @@ def generuj_test(temat, klasa, liczba_zadan, trudnosc, typ):
         )
         return response.choices[0].message.content
     except Exception as e:
-        print("Błąd:", e)
+        st.error(f"Błąd: {e}")
         return None

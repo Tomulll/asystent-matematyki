@@ -27,4 +27,5 @@ if submit:
                 st.markdown(wynik)
             else:
                 st.error("Coś poszło nie tak. Spróbuj ponownie.")
+                st.stop()
 
