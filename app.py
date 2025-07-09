@@ -72,29 +72,32 @@ with zakladki[1]:
                     },
                     {
                         "role": "user",
-                        "content": f"""
-Na podstawie poniższego zdjęcia testu ucznia:
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": f"""
+        Na podstawie poniższego zdjęcia testu ucznia:
 
-1. Rozpoznaj odpowiedzi w formacie: {{1: "A", 2: "B", ...}}.
-2. Porównaj je z kluczem odpowiedzi.
-3. Oblicz wynik i dodaj krótkie podsumowanie (ile poprawnych, ile błędnych).
-4. Nie pisz nic poza analizą – tylko wynik i detale.
+        1. Rozpoznaj odpowiedzi w formacie: {{1: "A", 2: "B", ...}}.
+        2. Porównaj je z kluczem odpowiedzi.
+        3. Oblicz wynik i dodaj krótkie podsumowanie (ile poprawnych, ile błędnych).
+        4. Nie pisz nic poza analizą – tylko wynik i detale.
 
-Poprawne odpowiedzi to:
-{{1: "C", 2: "A", 3: "D", 4: "B", 5: "C"}}
-""",
-                    },
-                ],
-                tools=[
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{image_b64}",
-                            "detail": "high"
-                        },
+        Poprawne odpowiedzi to:
+        {{1: "C", 2: "A", 3: "D", 4: "B", 5: "C"}}
+        """
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{image_b64}",
+                                    "detail": "high"
+                                }
+                            }
+                        ]
                     }
                 ],
-                max_tokens=800,
+                max_tokens=800
             )
 
             wynik = response.choices[0].message.content.strip()
