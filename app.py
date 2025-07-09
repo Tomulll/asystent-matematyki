@@ -3,8 +3,10 @@ from test_generator import generuj_test
 import pytesseract
 from PIL import Image
 import json
+import openai
+import base64
 
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+openai.api_key = st.secrets["openai_api_key"]
 
 st.set_page_config(page_title="Asystent AI dla nauczyciela matematyki")
 
@@ -47,15 +49,37 @@ with zakladki[1]:
     uploaded_image = st.file_uploader("Prześlij zdjęcie lub skan testu ucznia (JPG/PNG)", type=["png", "jpg", "jpeg"])
 
     if uploaded_image:
-        image = Image.open(uploaded_image)
-        st.image(image, caption="Załadowany test", use_column_width=True)
+        st.image(uploaded_image, caption="Załadowany test", use_column_width=True)
 
         try:
-            extracted_text = pytesseract.image_to_string(image, lang="pol")
-            st.subheader("📝 Odczytany tekst:")
+            # Zakoduj obraz do base64
+            image_data = base64.b64encode(uploaded_image.read()).decode("utf-8")
+
+            prompt = (
+                "Na tym zdjęciu znajduje się kartka z odpowiedziami do testu (np. 1. A, 2. B…). "
+                "Proszę odczytaj odpowiedzi i wypisz je w formacie:\n1. A\n2. B\n3. C itd."
+            )
+
+            with st.spinner("Rozpoznaję odpowiedzi..."):
+                response = openai.ChatCompletion.create(
+                    model="gpt-4o",
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": prompt},
+                                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}}
+                            ]
+                        }
+                    ]
+                )
+
+                extracted_text = response.choices[0].message.content
+
+            st.subheader("📝 Rozpoznany tekst:")
             st.text(extracted_text)
 
-            # Przykładowy klucz odpowiedzi – docelowo powinien być dynamiczny
+            # Przykładowy klucz odpowiedzi – możesz potem to zautomatyzować
             poprawne_odpowiedzi = {
                 1: "C",
                 2: "A",
@@ -64,7 +88,6 @@ with zakladki[1]:
                 5: "C"
             }
 
-            # Funkcja sprawdzająca
             def sprawdz_test(tekst, klucz):
                 punkty = 0
                 feedback = ""
@@ -84,5 +107,4 @@ with zakladki[1]:
 
         except Exception as e:
             st.error(f"Wystąpił błąd podczas OCR: {e}")
-
 
