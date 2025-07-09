@@ -3,10 +3,10 @@ from test_generator import generuj_test
 import pytesseract
 from PIL import Image
 import json
-import openai
+from openai import OpenAI
 import base64
 
-openai.api_key = st.secrets["openai_api_key"]
+client = OpenAI(api_key=st.secrets["openai_api_key"])
 
 st.set_page_config(page_title="Asystent AI dla nauczyciela matematyki")
 
@@ -43,68 +43,75 @@ with zakladki[0]:
 
 
 # === 📤 SPRAWDZANIE TESTU ===
+
 with zakladki[1]:
     st.subheader("📤 Sprawdź test ucznia")
 
-    uploaded_image = st.file_uploader("Prześlij zdjęcie lub skan testu ucznia (JPG/PNG)", type=["png", "jpg", "jpeg"])
+    odpowiedzi_input = st.text_area(
+        "Wklej odpowiedzi ucznia (np. 1. A, 2. B, ...):",
+        height=200,
+        placeholder="Przykład:\n1. C\n2. A\n3. B\n4. D\n5. C"
+    )
 
-    if uploaded_image:
-        st.image(uploaded_image, caption="Załadowany test", use_column_width=True)
+    if st.button("Sprawdź odpowiedzi"):
+        if odpowiedzi_input.strip() == "":
+            st.warning("Wprowadź odpowiedzi ucznia.")
+        else:
+            with st.spinner("Wysyłam dane do modelu GPT..."):
+                client = OpenAI(api_key=st.secrets["openai_api_key"])
 
-        try:
-            # Zakoduj obraz do base64
-            image_data = base64.b64encode(uploaded_image.read()).decode("utf-8")
+                prompt = f"""
+Na podstawie poniższych odpowiedzi ucznia wygeneruj słownik w formacie Python:
+{{1: "C", 2: "A", ...}}.
+Jeśli numer lub litera są nieczytelne lub błędne – pomiń lub wpisz "?".
 
-            prompt = (
-                "Na tym zdjęciu znajduje się kartka z odpowiedziami do testu (np. 1. A, 2. B…). "
-                "Proszę odczytaj odpowiedzi i wypisz je w formacie:\n1. A\n2. B\n3. C itd."
-            )
+Odpowiedzi ucznia:
+\"\"\"{odpowiedzi_input}\"\"\"
+"""
 
-            with st.spinner("Rozpoznaję odpowiedzi..."):
-                response = openai.ChatCompletion.create(
+                response = client.chat.completions.create(
                     model="gpt-4o",
                     messages=[
-                        {
-                            "role": "user",
-                            "content": [
-                                {"type": "text", "text": prompt},
-                                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}}
-                            ]
-                        }
-                    ]
+                        {"role": "system", "content": "Jesteś pomocnym asystentem nauczyciela matematyki."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0,
+                    max_tokens=500
                 )
 
-                extracted_text = response.choices[0].message.content
+                odpowiedzi_tekst = response.choices[0].message.content.strip()
+                st.subheader("📦 Odpowiedzi ucznia (parsowane):")
+                st.code(odpowiedzi_tekst)
 
-            st.subheader("📝 Rozpoznany tekst:")
-            st.text(extracted_text)
+                try:
+                    odpowiedzi_ucznia = eval(odpowiedzi_tekst)
+                except Exception as e:
+                    st.error(f"Nie udało się sparsować odpowiedzi: {e}")
+                    odpowiedzi_ucznia = {}
 
-            # Przykładowy klucz odpowiedzi – możesz potem to zautomatyzować
-            poprawne_odpowiedzi = {
-                1: "C",
-                2: "A",
-                3: "D",
-                4: "B",
-                5: "C"
-            }
+                poprawne_odpowiedzi = {
+                    1: "C",
+                    2: "A",
+                    3: "D",
+                    4: "B",
+                    5: "C"
+                }
 
-            def sprawdz_test(tekst, klucz):
-                punkty = 0
-                feedback = ""
-                for nr, poprawna in klucz.items():
-                    if f"{nr}. {poprawna}" in tekst or f"{nr}.{poprawna}" in tekst or f"{nr} {poprawna}" in tekst:
-                        punkty += 1
-                        feedback += f"{nr}. ✅ poprawna\n"
-                    else:
-                        feedback += f"{nr}. ❌ błędna lub brak odpowiedzi (oczekiwano: {poprawna})\n"
-                return punkty, feedback
+                def sprawdz_test(odpowiedzi_ucznia, klucz):
+                    punkty = 0
+                    feedback = ""
+                    for nr, poprawna in klucz.items():
+                        odp = odpowiedzi_ucznia.get(nr, "?")
+                        if odp == poprawna:
+                            punkty += 1
+                            feedback += f"{nr}. ✅ poprawna\n"
+                        else:
+                            feedback += f"{nr}. ❌ błędna (oczekiwano: {poprawna}, otrzymano: {odp})\n"
+                    return punkty, feedback
 
-            score, szczegoly = sprawdz_test(extracted_text, poprawne_odpowiedzi)
-
-            st.success(f"Wynik: {score}/{len(poprawne_odpowiedzi)}")
-            st.markdown("### Szczegóły oceny:")
-            st.markdown(szczegoly)
-
-        except Exception as e:
-            st.error(f"Wystąpił błąd podczas OCR: {e}")
+                if odpowiedzi_ucznia:
+                    score, szczegoly = sprawdz_test(odpowiedzi_ucznia, poprawne_odpowiedzi)
+                    st.success(f"Wynik: {score}/{len(poprawne_odpowiedzi)}")
+                    st.markdown("### Szczegóły oceny:")
+                    st.markdown(szczegoly)
 
