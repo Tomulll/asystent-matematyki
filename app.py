@@ -44,74 +44,65 @@ with zakladki[0]:
 
 # === 📤 SPRAWDZANIE TESTU ===
 
-with zakladki[1]:
-    st.subheader("📤 Sprawdź test ucznia")
 
-    odpowiedzi_input = st.text_area(
-        "Wklej odpowiedzi ucznia (np. 1. A, 2. B, ...):",
-        height=200,
-        placeholder="Przykład:\n1. C\n2. A\n3. B\n4. D\n5. C"
+
+with zakladki[1]:
+    st.subheader("📤 Sprawdź test ucznia (na podstawie zdjęcia)")
+
+    uploaded_image = st.file_uploader(
+        "Prześlij zdjęcie lub skan testu ucznia (JPG/PNG)", type=["png", "jpg", "jpeg"]
     )
 
-    if st.button("Sprawdź odpowiedzi"):
-        if odpowiedzi_input.strip() == "":
-            st.warning("Wprowadź odpowiedzi ucznia.")
-        else:
-            with st.spinner("Wysyłam dane do modelu GPT..."):
-                client = OpenAI(api_key=st.secrets["openai_api_key"])
+    if uploaded_image:
+        st.image(uploaded_image, caption="Załadowany test", use_column_width=True)
 
-                prompt = f"""
-Na podstawie poniższych odpowiedzi ucznia wygeneruj słownik w formacie Python:
-{{1: "C", 2: "A", ...}}.
-Jeśli numer lub litera są nieczytelne lub błędne – pomiń lub wpisz "?".
+        try:
+            # Wczytaj i zakoduj obraz do base64
+            image_bytes = uploaded_image.read()
+            image_b64 = base64.b64encode(image_bytes).decode("utf-8")
 
-Odpowiedzi ucznia:
-\"\"\"{odpowiedzi_input}\"\"\"
-"""
+            client = OpenAI(api_key=st.secrets["openai_api_key"])
 
-                response = client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=[
-                        {"role": "system", "content": "Jesteś pomocnym asystentem nauczyciela matematyki."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=0,
-                    max_tokens=500
-                )
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "Jesteś pomocnym asystentem nauczyciela matematyki. Twoim zadaniem jest odczytanie odpowiedzi z odręcznego testu ucznia, a następnie porównanie ich z poprawnymi odpowiedziami."
+                    },
+                    {
+                        "role": "user",
+                        "content": f"""
+Na podstawie poniższego zdjęcia testu ucznia:
 
-                odpowiedzi_tekst = response.choices[0].message.content.strip()
-                st.subheader("📦 Odpowiedzi ucznia (parsowane):")
-                st.code(odpowiedzi_tekst)
+1. Rozpoznaj odpowiedzi w formacie: {{1: "A", 2: "B", ...}}.
+2. Porównaj je z kluczem odpowiedzi.
+3. Oblicz wynik i dodaj krótkie podsumowanie (ile poprawnych, ile błędnych).
+4. Nie pisz nic poza analizą – tylko wynik i detale.
 
-                try:
-                    odpowiedzi_ucznia = eval(odpowiedzi_tekst)
-                except Exception as e:
-                    st.error(f"Nie udało się sparsować odpowiedzi: {e}")
-                    odpowiedzi_ucznia = {}
+Poprawne odpowiedzi to:
+{{1: "C", 2: "A", 3: "D", 4: "B", 5: "C"}}
+""",
+                    },
+                ],
+                tools=[
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{image_b64}",
+                            "detail": "high"
+                        },
+                    }
+                ],
+                max_tokens=800,
+            )
 
-                poprawne_odpowiedzi = {
-                    1: "C",
-                    2: "A",
-                    3: "D",
-                    4: "B",
-                    5: "C"
-                }
+            wynik = response.choices[0].message.content.strip()
+            st.success("✅ Analiza zakończona!")
+            st.markdown("### 📋 Wynik sprawdzianu ucznia:")
+            st.markdown(wynik)
 
-                def sprawdz_test(odpowiedzi_ucznia, klucz):
-                    punkty = 0
-                    feedback = ""
-                    for nr, poprawna in klucz.items():
-                        odp = odpowiedzi_ucznia.get(nr, "?")
-                        if odp == poprawna:
-                            punkty += 1
-                            feedback += f"{nr}. ✅ poprawna\n"
-                        else:
-                            feedback += f"{nr}. ❌ błędna (oczekiwano: {poprawna}, otrzymano: {odp})\n"
-                    return punkty, feedback
+        except Exception as e:
+            st.error(f"Wystąpił błąd podczas OCR przez GPT: {e}")
 
-                if odpowiedzi_ucznia:
-                    score, szczegoly = sprawdz_test(odpowiedzi_ucznia, poprawne_odpowiedzi)
-                    st.success(f"Wynik: {score}/{len(poprawne_odpowiedzi)}")
-                    st.markdown("### Szczegóły oceny:")
-                    st.markdown(szczegoly)
 
