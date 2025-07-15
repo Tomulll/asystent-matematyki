@@ -11,11 +11,11 @@ import json
 from openai import OpenAI
 import base64
 
-
+st.set_page_config(page_title="Asystent AI dla nauczyciela matematyki")
 
 client = OpenAI(api_key=st.secrets["openai_api_key"])
 
-st.set_page_config(page_title="Asystent AI dla nauczyciela matematyki")
+
 
 st.title("🧠 Asystent AI dla nauczyciela matematyki")
 
