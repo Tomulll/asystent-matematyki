@@ -43,69 +43,69 @@ with zakladki[0]:
 
 
 # === 📤 SPRAWDZANIE TESTU ===
-
-
-
 with zakladki[1]:
-    st.subheader("📤 Sprawdź test ucznia (na podstawie zdjęcia)")
+    st.subheader("📤 Sprawdź test ucznia")
 
-    uploaded_image = st.file_uploader(
-        "Prześlij zdjęcie lub skan testu ucznia (JPG/PNG)", type=["png", "jpg", "jpeg"]
-    )
+    with st.form("formularz_klucz"):
+        liczba_zadan = st.number_input("Podaj liczbę zadań:", min_value=1, max_value=20, step=1)
+        zadania = []
+        for i in range(1, liczba_zadan + 1):
+            col1, col2, col3 = st.columns([1, 2, 2])
+            with col1:
+                typ = st.selectbox(f"Zadanie {i} - Typ", ["zamknięte", "otwarte"], key=f"typ_{i}")
+            with col2:
+                odp = st.text_input(f"Poprawna odpowiedź (A/B/C/D lub wynik)", key=f"odp_{i}")
+            with col3:
+                pkt = st.number_input(f"Punkty", min_value=1, max_value=10, step=1, key=f"pkt_{i}")
+            zadania.append({"nr": i, "typ": typ, "odp": odp.upper(), "pkt": pkt})
 
-    if uploaded_image:
+        submit_klucz = st.form_submit_button("Zapisz klucz odpowiedzi")
+
+    if submit_klucz:
+        st.session_state["klucz_odpowiedzi"] = zadania
+        st.success("Klucz odpowiedzi zapisany!")
+
+    uploaded_image = st.file_uploader("Prześlij zdjęcie lub skan testu ucznia (JPG/PNG)", type=["png", "jpg", "jpeg"])
+
+    if uploaded_image and "klucz_odpowiedzi" in st.session_state:
         st.image(uploaded_image, caption="Załadowany test", use_column_width=True)
 
+        image_bytes = uploaded_image.read()
+        image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+
         try:
-            # Wczytaj i zakoduj obraz do base64
-            image_bytes = uploaded_image.read()
-            image_b64 = base64.b64encode(image_bytes).decode("utf-8")
-
-            client = OpenAI(api_key=st.secrets["openai_api_key"])
-
+            
             response = client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
-                    {
-                        "role": "system",
-                        "content": "Jesteś pomocnym asystentem nauczyciela matematyki. Twoim zadaniem jest odczytanie odpowiedzi z odręcznego testu ucznia, a następnie porównanie ich z poprawnymi odpowiedziami."
-                    },
+                    {"role": "system", "content": "Jesteś nauczycielem sprawdzającym test matematyczny na podstawie zdjęcia."},
                     {
                         "role": "user",
                         "content": [
                             {
                                 "type": "text",
-                                "text": f"""
-        Na podstawie poniższego zdjęcia testu ucznia:
-
-        1. Rozpoznaj odpowiedzi w formacie: {{1: "A", 2: "B", ...}}.
-        2. Porównaj je z kluczem odpowiedzi.
-        3. Oblicz wynik i dodaj krótkie podsumowanie (ile poprawnych, ile błędnych).
-        4. Nie pisz nic poza analizą – tylko wynik i detale.
-
-        Poprawne odpowiedzi to:
-        {{1: "C", 2: "A", 3: "D", 4: "B", 5: "C"}}
-        """
+                                "text": f"Na podstawie poniższego zdjęcia rozpoznaj odpowiedzi ucznia. Następnie porównaj je z tym kluczem: {st.session_state['klucz_odpowiedzi']}. Oceń każdą odpowiedź, przyznaj punkty i podaj wynik końcowy."
                             },
                             {
                                 "type": "image_url",
                                 "image_url": {
-                                    "url": f"data:image/jpeg;base64,{image_b64}",
-                                    "detail": "high"
+                                    "url": f"data:image/jpeg;base64,{image_b64}"
                                 }
                             }
                         ]
                     }
                 ],
-                max_tokens=800
+                max_tokens=1000
             )
 
-            wynik = response.choices[0].message.content.strip()
-            st.success("✅ Analiza zakończona!")
-            st.markdown("### 📋 Wynik sprawdzianu ucznia:")
+            wynik = response.choices[0].message.content
+            st.markdown("### 📋 Wynik oceny:")
             st.markdown(wynik)
 
         except Exception as e:
             st.error(f"Wystąpił błąd podczas OCR przez GPT: {e}")
+
+    elif uploaded_image:
+        st.warning("Najpierw uzupełnij klucz odpowiedzi.")
 
 
