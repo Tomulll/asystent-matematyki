@@ -1,9 +1,4 @@
 import streamlit as st
-st.markdown("""
-<link rel="manifest" href="/static/manifest.json">
-<meta name="theme-color" content="#2b2b2b">
-""", unsafe_allow_html=True)
-
 from test_generator import generuj_test
 import pytesseract
 from PIL import Image
@@ -12,6 +7,11 @@ from openai import OpenAI
 import base64
 
 st.set_page_config(page_title="Asystent AI dla nauczyciela matematyki")
+
+st.markdown("""
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#2b2b2b">
+""", unsafe_allow_html=True)
 
 client = OpenAI(api_key=st.secrets["openai_api_key"])
 
